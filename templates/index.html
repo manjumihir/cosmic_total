@@ -1,0 +1,27 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Cosmic Calculator</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 20px;
+        }
+        .planet-card {
+            border: 1px solid #ccc;
+            padding: 10px;
+            margin: 10px;
+            border-radius: 5px;
+        }
+    </style>
+</head>
+<body>
+    <h1>Planetary Positions</h1>
+    {% for planet in data.planet_positions %}
+    <div class="planet-card">
+        <h3>{{ planet.planet }}</h3>
+        <p>Position: {{ planet.position }}</p>
+    </div>
+    {% endfor %}
+</body>
+</html> 
