@@ -1,0 +1,5 @@
+PyQt6>=6.4.0
+geopy>=2.3.0
+ephem>=4.1.4
+pyswisseph>=2.10.3.1
+pytz>=2023.3

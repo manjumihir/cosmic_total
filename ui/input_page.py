@@ -7,8 +7,8 @@ from PyQt6.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout, QLineEdit,
                            QGroupBox, QComboBox, QScrollArea, QDateTimeEdit,
                            QTreeWidget, QTreeWidgetItem, QStackedWidget, QApplication)
 from PyQt6.QtCore import QDateTime, Qt
-from data.constants import POSITIONSTACK_API_KEY
-import requests
+from geopy.geocoders import Nominatim
+from geopy.exc import GeocoderTimedOut
 import json
 from utils.astro_calc import AstroCalc, DashaCalculator
 from datetime import datetime
@@ -24,6 +24,75 @@ class InputPage(QWidget):
         self.chart_data = None
         self.init_ui()
         
+    def decimal_to_dms(self, decimal, is_latitude=True):
+        """Convert decimal degrees to degrees, minutes, seconds string"""
+        direction = ""
+        if is_latitude:
+            direction = "N" if decimal >= 0 else "S"
+        else:
+            direction = "E" if decimal >= 0 else "W"
+        
+        decimal = abs(decimal)
+        degrees = int(decimal)
+        decimal_minutes = (decimal - degrees) * 60
+        minutes = int(decimal_minutes)
+        decimal_seconds = (decimal_minutes - minutes) * 60
+        seconds = int(decimal_seconds)
+        
+        return f"{degrees}° {minutes}' {seconds}\" {direction}"
+    
+    def dms_to_decimal(self, dms_str):
+        """Convert DMS string to decimal degrees"""
+        try:
+            # Remove any spaces around the string
+            dms_str = dms_str.strip()
+            
+            # Extract direction (N/S/E/W)
+            direction = dms_str[-1].upper()
+            if direction not in ['N', 'S', 'E', 'W']:
+                raise ValueError("Invalid direction")
+            
+            # Remove direction and split into components
+            parts = dms_str[:-1].replace('°', ' ').replace("'", ' ').replace('"', ' ').split()
+            if len(parts) != 3:
+                raise ValueError("Invalid format")
+            
+            degrees = int(parts[0])
+            minutes = int(parts[1])
+            seconds = int(parts[2])
+            
+            if not (0 <= minutes < 60 and 0 <= seconds < 60):
+                raise ValueError("Invalid minutes or seconds")
+            
+            decimal = degrees + minutes/60 + seconds/3600
+            
+            # Apply direction
+            if direction in ['S', 'W']:
+                decimal = -decimal
+                
+            return decimal
+            
+        except Exception as e:
+            raise ValueError(f"Invalid DMS format. Use format: DD° MM' SS\" N/S/E/W")
+    
+    def update_coord_display(self):
+        """Update coordinate displays with proper formatting"""
+        try:
+            lat_text = self.lat_input.text()
+            lon_text = self.long_input.text()
+            
+            # Only convert if the text contains a decimal number
+            if '.' in lat_text:
+                lat_decimal = float(lat_text)
+                self.lat_input.setText(self.decimal_to_dms(lat_decimal, True))
+            
+            if '.' in lon_text:
+                lon_decimal = float(lon_text)
+                self.long_input.setText(self.decimal_to_dms(lon_decimal, False))
+                
+        except ValueError:
+            pass
+
     def init_ui(self):
         # Create main layout
         main_layout = QVBoxLayout()
@@ -55,13 +124,18 @@ class InputPage(QWidget):
         city_layout.addWidget(self.city_input)
         input_layout.addLayout(city_layout)
         
-        # Lat/Long inputs
+        # Lat/Long inputs with tooltips
         coords_layout = QHBoxLayout()
         coords_layout.addWidget(QLabel("Latitude:"))
         self.lat_input = QLineEdit()
+        self.lat_input.setToolTip("Format: DD° MM' SS\" N/S (e.g., 40° 26' 46\" N)")
+        self.lat_input.setPlaceholderText("e.g., 40° 26' 46\" N")
         coords_layout.addWidget(self.lat_input)
+        
         coords_layout.addWidget(QLabel("Longitude:"))
         self.long_input = QLineEdit()
+        self.long_input.setToolTip("Format: DD° MM' SS\" E/W (e.g., 79° 58' 56\" W)")
+        self.long_input.setPlaceholderText("e.g., 79° 58' 56\" W")
         coords_layout.addWidget(self.long_input)
         input_layout.addLayout(coords_layout)
         
@@ -229,22 +303,28 @@ class InputPage(QWidget):
         self.setLayout(main_layout)
 
     def fetch_coordinates(self):
+        """Fetch coordinates for the entered city"""
         city = self.city_input.text().strip()
         if not city:
             QMessageBox.warning(self, "Error", "Please enter a city name")
             return
             
         try:
-            url = f"http://api.positionstack.com/v1/forward?access_key={POSITIONSTACK_API_KEY}&query={city}"
-            response = requests.get(url)
-            data = response.json()
-            
-            if data.get('data'):
-                location = data['data'][0]
-                self.lat_input.setText(str(location['latitude']))
-                self.long_input.setText(str(location['longitude']))
+            # Make API request
+            geolocator = Nominatim(user_agent="astrology_app")
+            location = geolocator.geocode(city)
+            if location:
+                lat = location.latitude
+                lon = location.longitude
+                
+                # Convert to DMS format
+                self.lat_input.setText(self.decimal_to_dms(lat, True))
+                self.long_input.setText(self.decimal_to_dms(lon, False))
             else:
                 QMessageBox.warning(self, "Error", "City not found")
+                
+        except GeocoderTimedOut:
+            QMessageBox.warning(self, "Error", "Geocoder timed out")
         except Exception as e:
             QMessageBox.warning(self, "Error", f"Failed to fetch coordinates: {str(e)}")
 
@@ -260,8 +340,8 @@ class InputPage(QWidget):
             "name": self.name_input.text(),
             "datetime": self.date_time.dateTime().toString("dd/MM/yyyy hh:mm"),
             "city": self.city_input.text(),
-            "latitude": float(self.lat_input.text()),
-            "longitude": float(self.long_input.text())
+            "latitude": float(self.lat_input.text()) if self.lat_input.text().strip() else None,
+            "longitude": float(self.long_input.text()) if self.long_input.text().strip() else None
         }
         
         # Save to file (you might want to use a database instead)
@@ -370,10 +450,10 @@ class InputPage(QWidget):
                 
             # Validate coordinates
             try:
-                latitude = float(self.lat_input.text())
-                longitude = float(self.long_input.text())
-            except ValueError:
-                QMessageBox.warning(self, "Error", "Please enter valid latitude and longitude values")
+                latitude = self.dms_to_decimal(self.lat_input.text())
+                longitude = self.dms_to_decimal(self.long_input.text())
+            except ValueError as e:
+                QMessageBox.warning(self, "Error", str(e))
                 return
                 
             # Get datetime
@@ -424,15 +504,6 @@ class InputPage(QWidget):
             self.yogeswarananada_btn.setEnabled(False)
             self.dashas_btn.setEnabled(False)
 
-    def decimal_to_dms(self, decimal_degrees):
-        """Convert decimal degrees to degrees, minutes, and seconds"""
-        degrees = int(decimal_degrees)
-        decimal_minutes = (decimal_degrees - degrees) * 60
-        minutes = int(decimal_minutes)
-        decimal_seconds = (decimal_minutes - minutes) * 60
-        seconds = int(decimal_seconds)
-        return f"{degrees}°{minutes:02d}'{seconds:02d}\""
-
     def display_results(self, chart_data):
         """Display the calculation results."""
         try:
@@ -445,7 +516,13 @@ class InputPage(QWidget):
             # Create a formatted text output
             output = f"Calculations for {self.name_input.text()}\n"
             output += f"Date & Time: {chart_data['meta']['datetime']}\n"
-            output += f"Location: {self.city_input.text()} ({chart_data['meta']['latitude']}, {chart_data['meta']['longitude']})\n\n"
+            
+            # Convert coordinates to DMS format for display
+            lat = float(chart_data['meta']['latitude'])
+            lon = float(chart_data['meta']['longitude'])
+            lat_dms = self.decimal_to_dms(lat, True)
+            lon_dms = self.decimal_to_dms(lon, False)
+            output += f"Location: {self.city_input.text()} ({lat_dms}, {lon_dms})\n\n"
             
             output += "Planetary Positions:\n"
             output += "-------------------\n"
