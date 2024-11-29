@@ -5,7 +5,7 @@ from PyQt6.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout, QLineEdit,
                            QPushButton, QLabel, QMessageBox, QDialog, 
                            QTableWidget, QTableWidgetItem, QTextEdit, 
                            QGroupBox, QComboBox, QScrollArea, QDateTimeEdit,
-                           QTreeWidget, QTreeWidgetItem, QStackedWidget)
+                           QTreeWidget, QTreeWidgetItem, QStackedWidget, QApplication)
 from PyQt6.QtCore import QDateTime, Qt
 from data.constants import POSITIONSTACK_API_KEY
 import requests
@@ -401,12 +401,23 @@ class InputPage(QWidget):
             # Update the main display
             self.display_results(self.chart_data)
             
-            # Create and show the chart dialog
-            chart_widget = NorthernChartWidget(self, input_page=self)
-            chart_widget.update_data(self.chart_data)
+            # Find existing chart dialog
+            existing_dialog = None
+            for widget in QApplication.topLevelWidgets():
+                if isinstance(widget, ChartDialog):
+                    existing_dialog = widget
+                    break
             
-            dialog = ChartDialog(chart_widget, self)
-            dialog.show()
+            if existing_dialog:
+                # Update existing chart widget
+                existing_dialog.chart_widget.update_data(self.chart_data)
+                existing_dialog.chart_widget.update()
+            else:
+                # Create and show new chart dialog
+                chart_widget = NorthernChartWidget(self, input_page=self)
+                chart_widget.update_data(self.chart_data)
+                dialog = ChartDialog(chart_widget, self)
+                dialog.show()
             
         except Exception as e:
             QMessageBox.warning(self, "Error", f"Failed to calculate chart: {str(e)}")
