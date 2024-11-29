@@ -44,25 +44,30 @@ class InputPage(QWidget):
     def dms_to_decimal(self, dms_str):
         """Convert DMS string to decimal degrees"""
         try:
-            # Remove any spaces around the string
+            # Remove any spaces around the string and handle empty input
             dms_str = dms_str.strip()
+            if not dms_str:
+                raise ValueError("Empty input")
             
             # Extract direction (N/S/E/W)
             direction = dms_str[-1].upper()
             if direction not in ['N', 'S', 'E', 'W']:
-                raise ValueError("Invalid direction")
+                raise ValueError("Invalid direction. Must end with N, S, E, or W")
             
             # Remove direction and split into components
             parts = dms_str[:-1].replace('°', ' ').replace("'", ' ').replace('"', ' ').split()
             if len(parts) != 3:
-                raise ValueError("Invalid format")
+                raise ValueError("Must be in format: DD° MM' SS\" N/S/E/W")
             
-            degrees = int(parts[0])
-            minutes = int(parts[1])
-            seconds = int(parts[2])
+            try:
+                degrees = float(parts[0])
+                minutes = float(parts[1])
+                seconds = float(parts[2])
+            except ValueError:
+                raise ValueError("Degrees, minutes, and seconds must be numbers")
             
             if not (0 <= minutes < 60 and 0 <= seconds < 60):
-                raise ValueError("Invalid minutes or seconds")
+                raise ValueError("Minutes and seconds must be between 0 and 59")
             
             decimal = degrees + minutes/60 + seconds/3600
             
@@ -72,8 +77,10 @@ class InputPage(QWidget):
                 
             return decimal
             
+        except ValueError as e:
+            raise ValueError(str(e))
         except Exception as e:
-            raise ValueError(f"Invalid DMS format. Use format: DD° MM' SS\" N/S/E/W")
+            raise ValueError("Invalid DMS format. Use format: DD° MM' SS\" N/S/E/W")
     
     def update_coord_display(self):
         """Update coordinate displays with proper formatting"""
@@ -93,6 +100,89 @@ class InputPage(QWidget):
         except ValueError:
             pass
 
+    def validate_dms_input(self, input_field, is_latitude):
+        """Validate DMS input and offer conversion if needed"""
+        try:
+            input_text = input_field.text().strip()
+            if not input_text:
+                return False
+
+            # Check if it's in DMS format (ends with direction)
+            if input_text[-1].upper() in ['N', 'S'] if is_latitude else ['E', 'W']:
+                # Try parsing as DMS
+                try:
+                    parts = input_text[:-1].replace('°', ' ').replace("'", ' ').replace('"', ' ').split()
+                    
+                    # Handle partial DMS format (without seconds)
+                    if len(parts) == 2:  # Only degrees and minutes
+                        parts.append('00')  # Add 00 seconds
+                        input_text = f"{parts[0]}° {parts[1]}' 00\" {input_text[-1]}"
+                        input_field.setText(input_text)
+                    elif len(parts) != 3:
+                        raise ValueError("Invalid DMS format")
+                    
+                    degrees = float(parts[0])
+                    minutes = float(parts[1])
+                    seconds = float(parts[2])
+                    
+                    # Validate ranges
+                    if not (0 <= minutes < 60 and 0 <= seconds < 60):
+                        raise ValueError("Minutes and seconds must be between 0 and 59")
+                    
+                    # Calculate decimal for range validation
+                    decimal = degrees + minutes/60 + seconds/3600
+                    if input_text[-1] in ['S', 'W']:
+                        decimal = -decimal
+                        
+                    # Validate coordinate ranges
+                    if is_latitude and abs(decimal) > 90:
+                        raise ValueError("Latitude must be between 90°N and 90°S")
+                    elif not is_latitude and abs(decimal) > 180:
+                        raise ValueError("Longitude must be between 180°E and 180°W")
+                    
+                    return True
+                    
+                except (ValueError, IndexError) as e:
+                    QMessageBox.warning(None, "Invalid Input", str(e))
+                    return False
+            
+            # Try decimal format
+            try:
+                decimal = float(input_text)
+                
+                # Validate ranges
+                if is_latitude and abs(decimal) > 90:
+                    raise ValueError("Latitude must be between -90° and 90°")
+                elif not is_latitude and abs(decimal) > 180:
+                    raise ValueError("Longitude must be between -180° and 180°")
+                
+                # Ask for conversion to DMS
+                coord_type = "latitude" if is_latitude else "longitude"
+                dms_format = self.decimal_to_dms(decimal, is_latitude)
+                
+                msg = QMessageBox()
+                msg.setIcon(QMessageBox.Icon.Question)
+                msg.setText(f"Would you like to convert this {coord_type} to degrees, minutes, seconds format?")
+                msg.setInformativeText(f"Current value: {decimal}\nWill be converted to: {dms_format}")
+                msg.setWindowTitle("Convert Coordinate Format")
+                msg.setStandardButtons(QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No)
+                msg.setDefaultButton(QMessageBox.StandardButton.Yes)
+                
+                if msg.exec() == QMessageBox.StandardButton.Yes:
+                    input_field.setText(dms_format)
+                return True
+                
+            except ValueError:
+                QMessageBox.warning(None, "Invalid Input", 
+                    "Please enter either:\n" +
+                    "- DMS format (e.g., 40° 26' N or 40° 26' 46\" N)\n" +
+                    "- Decimal format (e.g., 40.446)")
+                return False
+                
+        except Exception as e:
+            QMessageBox.warning(None, "Error", str(e))
+            return False
+    
     def init_ui(self):
         # Create main layout
         main_layout = QVBoxLayout()
@@ -117,27 +207,37 @@ class InputPage(QWidget):
         date_layout.addWidget(self.date_time)
         input_layout.addLayout(date_layout)
         
-        # City input
+        # City input with search button
         city_layout = QHBoxLayout()
         city_layout.addWidget(QLabel("City:"))
         self.city_input = QLineEdit()
         city_layout.addWidget(self.city_input)
+        search_btn = QPushButton("Search")
+        search_btn.clicked.connect(self.fetch_coordinates)
+        city_layout.addWidget(search_btn)
         input_layout.addLayout(city_layout)
         
         # Lat/Long inputs with tooltips
         coords_layout = QHBoxLayout()
         coords_layout.addWidget(QLabel("Latitude:"))
         self.lat_input = QLineEdit()
-        self.lat_input.setToolTip("Format: DD° MM' SS\" N/S (e.g., 40° 26' 46\" N)")
-        self.lat_input.setPlaceholderText("e.g., 40° 26' 46\" N")
+        self.lat_input.setToolTip("Format: DD° MM' N/S or DD° MM' SS\" N/S\nExample: 40° 26' N or 40° 26' 46\" N")
+        self.lat_input.setPlaceholderText("e.g., 40° 26' N")
+        self.lat_input.editingFinished.connect(lambda: self.validate_dms_input(self.lat_input, True))
         coords_layout.addWidget(self.lat_input)
         
         coords_layout.addWidget(QLabel("Longitude:"))
         self.long_input = QLineEdit()
-        self.long_input.setToolTip("Format: DD° MM' SS\" E/W (e.g., 79° 58' 56\" W)")
-        self.long_input.setPlaceholderText("e.g., 79° 58' 56\" W")
+        self.long_input.setToolTip("Format: DD° MM' E/W or DD° MM' SS\" E/W\nExample: 73° 58' W or 73° 58' 33\" W")
+        self.long_input.setPlaceholderText("e.g., 73° 58' W")
+        self.long_input.editingFinished.connect(lambda: self.validate_dms_input(self.long_input, False))
         coords_layout.addWidget(self.long_input)
         input_layout.addLayout(coords_layout)
+        
+        # Add Calculate button
+        calc_btn = QPushButton("Calculate Chart")
+        calc_btn.clicked.connect(self.calculate_chart)
+        input_layout.addWidget(calc_btn)
         
         # Add Settings Section
         settings_group = QGroupBox("Calculation Settings")
@@ -256,18 +356,14 @@ class InputPage(QWidget):
         self.open_btn.clicked.connect(self.open_profile)
         button_layout.addWidget(self.open_btn)
         
-        self.calc_btn = QPushButton("Calculate")
-        self.calc_btn.clicked.connect(self.calculate_chart)
-        button_layout.addWidget(self.calc_btn)
+        self.dashas_btn = QPushButton("Show Dashas")
+        self.dashas_btn.clicked.connect(self.show_dashas)
+        button_layout.addWidget(self.dashas_btn)
         
         # Add the new yogeswarananada_12 button
         self.yogeswarananada_btn = QPushButton("yogeswarananada_12")
         self.yogeswarananada_btn.clicked.connect(self.yogeswarananada_handler)
         button_layout.addWidget(self.yogeswarananada_btn)
-        
-        self.dashas_btn = QPushButton("Show Dashas")
-        self.dashas_btn.clicked.connect(self.show_dashas)
-        button_layout.addWidget(self.dashas_btn)
         
         input_layout.addLayout(button_layout)
         
@@ -335,21 +431,32 @@ class InputPage(QWidget):
             QMessageBox.warning(self, "Error", "Please fill all fields")
             return
             
-        # Create profile data
-        profile_data = {
-            "name": self.name_input.text(),
-            "datetime": self.date_time.dateTime().toString("dd/MM/yyyy hh:mm"),
-            "city": self.city_input.text(),
-            "latitude": float(self.lat_input.text()) if self.lat_input.text().strip() else None,
-            "longitude": float(self.long_input.text()) if self.long_input.text().strip() else None
-        }
-        
-        # Save to file (you might want to use a database instead)
         try:
+            # Validate coordinates
+            lat_str = self.lat_input.text().strip()
+            lon_str = self.long_input.text().strip()
+            lat_decimal = self.dms_to_decimal(lat_str)
+            lon_decimal = self.dms_to_decimal(lon_str)
+            
+            # Create profile data
+            profile_data = {
+                "name": self.name_input.text(),
+                "datetime": self.date_time.dateTime().toString("dd/MM/yyyy hh:mm"),
+                "city": self.city_input.text(),
+                "latitude": lat_str,  # Store as DMS string
+                "longitude": lon_str,  # Store as DMS string
+                "latitude_decimal": lat_decimal,  # Store decimal for calculations
+                "longitude_decimal": lon_decimal  # Store decimal for calculations
+            }
+            
+            # Save to file
             with open("profiles.json", "a") as f:
                 json.dump(profile_data, f)
                 f.write("\n")
             QMessageBox.information(self, "Success", "Profile saved successfully!")
+            
+        except ValueError as e:
+            QMessageBox.warning(self, "Error", f"Invalid coordinates: {str(e)}")
         except Exception as e:
             QMessageBox.warning(self, "Error", f"Failed to save profile: {str(e)}")
 
@@ -379,8 +486,8 @@ class InputPage(QWidget):
                 table.setItem(row, 0, QTableWidgetItem(str(profile.get("name", ""))))
                 table.setItem(row, 1, QTableWidgetItem(str(profile.get("datetime", ""))))
                 table.setItem(row, 2, QTableWidgetItem(str(profile.get("city", ""))))
-                table.setItem(row, 3, QTableWidgetItem(str(profile.get("latitude", ""))))
-                table.setItem(row, 4, QTableWidgetItem(str(profile.get("longitude", ""))))
+                table.setItem(row, 3, QTableWidgetItem(str(profile.get("latitude", ""))))  # Use DMS string
+                table.setItem(row, 4, QTableWidgetItem(str(profile.get("longitude", ""))))  # Use DMS string
             
             # Add load button
             def load_selected():
@@ -389,8 +496,8 @@ class InputPage(QWidget):
                     profile = profiles[current_row]
                     self.name_input.setText(str(profile.get("name", "")))
                     self.city_input.setText(str(profile.get("city", "")))
-                    self.lat_input.setText(str(profile.get("latitude", "")))
-                    self.long_input.setText(str(profile.get("longitude", "")))
+                    self.lat_input.setText(str(profile.get("latitude", "")))  # Load DMS string
+                    self.long_input.setText(str(profile.get("longitude", "")))  # Load DMS string
                     
                     # Parse and set datetime
                     datetime_str = profile.get("datetime", "")
@@ -398,28 +505,20 @@ class InputPage(QWidget):
                         dt = QDateTime.fromString(datetime_str, "dd/MM/yyyy hh:mm")
                         self.date_time.setDateTime(dt)
                     
-                    # Load calculation settings
-                    if "zodiac_system" in profile:
-                        self.zodiac_system.setCurrentText(profile["zodiac_system"])
-                        # Make sure to enable/disable ayanamsa based on zodiac system
-                        self.ayanamsa.setEnabled(profile["zodiac_system"] == "Sidereal")
-                    if "ayanamsa" in profile:
-                        self.ayanamsa.setCurrentText(profile["ayanamsa"])
-                    
                     dialog.accept()
             
-            load_btn = QPushButton("Load Selected")
+            load_btn = QPushButton("Load")
             load_btn.clicked.connect(load_selected)
             
+            # Add widgets to layout
             layout.addWidget(table)
             layout.addWidget(load_btn)
-            dialog.setLayout(layout)
             
-            # Show dialog
+            dialog.setLayout(layout)
             dialog.exec()
             
         except FileNotFoundError:
-            QMessageBox.information(self, "Info", "No saved profiles found.")
+            QMessageBox.information(self, "Info", "No saved profiles found")
         except Exception as e:
             QMessageBox.warning(self, "Error", f"Failed to load profiles: {str(e)}")
 
@@ -443,23 +542,48 @@ class InputPage(QWidget):
     def calculate_chart(self):
         """Calculate and display the chart"""
         try:
-            # Basic validation first
+            # Validate all required fields
             if not self.name_input.text().strip():
                 QMessageBox.warning(self, "Error", "Please enter a name")
                 return
                 
-            # Validate coordinates
-            try:
-                latitude = self.dms_to_decimal(self.lat_input.text())
-                longitude = self.dms_to_decimal(self.long_input.text())
-            except ValueError as e:
-                QMessageBox.warning(self, "Error", str(e))
+            if not self.lat_input.text().strip() or not self.long_input.text().strip():
+                QMessageBox.warning(self, "Error", "Please enter both latitude and longitude")
                 return
                 
             # Get datetime
             birth_time = self.date_time.dateTime()
             if not birth_time.isValid():
                 QMessageBox.warning(self, "Error", "Please enter a valid date and time")
+                return
+                
+            # Validate coordinates
+            try:
+                lat_text = self.lat_input.text().strip()
+                lon_text = self.long_input.text().strip()
+                
+                # Try DMS format first
+                try:
+                    if lat_text[-1].upper() in ['N', 'S'] and lon_text[-1].upper() in ['E', 'W']:
+                        latitude = self.dms_to_decimal(lat_text)
+                        longitude = self.dms_to_decimal(lon_text)
+                    else:
+                        # Try decimal format
+                        latitude = float(lat_text)
+                        longitude = float(lon_text)
+                except (ValueError, IndexError):
+                    # Try decimal format as fallback
+                    latitude = float(lat_text)
+                    longitude = float(lon_text)
+                
+                # Validate ranges
+                if abs(latitude) > 90:
+                    raise ValueError("Latitude must be between 90°N and 90°S")
+                if abs(longitude) > 180:
+                    raise ValueError("Longitude must be between 180°E and 180°W")
+                    
+            except ValueError as e:
+                QMessageBox.warning(self, "Error", str(e))
                 return
                 
             # Calculate the chart data
@@ -680,3 +804,73 @@ class InputPage(QWidget):
             
         except Exception as e:
             QMessageBox.warning(self, "Error", f"An error occurred: {str(e)}")
+
+    def handle_coordinate_change(self):
+        try:
+            # Validate coordinates
+            lat_text = self.lat_input.text().strip()
+            lon_text = self.long_input.text().strip()
+            
+            # Try DMS format first
+            try:
+                if lat_text[-1].upper() in ['N', 'S'] and lon_text[-1].upper() in ['E', 'W']:
+                    latitude = self.dms_to_decimal(lat_text)
+                    longitude = self.dms_to_decimal(lon_text)
+                else:
+                    # Try decimal format
+                    latitude = float(lat_text)
+                    longitude = float(lon_text)
+            except (ValueError, IndexError):
+                # Try decimal format as fallback
+                latitude = float(lat_text)
+                longitude = float(lon_text)
+            
+            # Validate ranges
+            if abs(latitude) > 90:
+                raise ValueError("Latitude must be between 90°N and 90°S")
+            if abs(longitude) > 180:
+                raise ValueError("Longitude must be between 180°E and 180°W")
+                
+            # Calculate the chart data
+            self.chart_data = self.astro_calc.calculate_chart(
+                dt=self.date_time.dateTime().toPyDateTime(),
+                lat=latitude,
+                lon=longitude,
+                calc_type=self.calc_type.currentText(),
+                zodiac=self.zodiac_system.currentText(),
+                ayanamsa=self.ayanamsa.currentText(),
+                house_system=self.house_system.currentText(),
+                node_type=self.node_type.currentText()
+            )
+            
+            # Enable buttons after successful calculation
+            self.yogeswarananada_btn.setEnabled(True)
+            self.dashas_btn.setEnabled(True)
+            
+            # Update the main display
+            self.display_results(self.chart_data)
+            
+            # Find existing chart dialog
+            existing_dialog = None
+            for widget in QApplication.topLevelWidgets():
+                if isinstance(widget, ChartDialog):
+                    existing_dialog = widget
+                    break
+            
+            if existing_dialog:
+                # Update existing chart widget
+                existing_dialog.chart_widget.update_data(self.chart_data)
+                existing_dialog.chart_widget.update()
+            else:
+                # Create and show new chart dialog
+                chart_widget = NorthernChartWidget(self, input_page=self)
+                chart_widget.update_data(self.chart_data)
+                dialog = ChartDialog(chart_widget, self)
+                dialog.show()
+            
+        except ValueError as e:
+            QMessageBox.warning(self, "Error", str(e))
+        except Exception as e:
+            QMessageBox.warning(self, "Error", f"Failed to calculate chart: {str(e)}")
+            self.yogeswarananada_btn.setEnabled(False)
+            self.dashas_btn.setEnabled(False)
