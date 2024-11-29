@@ -402,7 +402,7 @@ class InputPage(QWidget):
             self.display_results(self.chart_data)
             
             # Create and show the chart dialog
-            chart_widget = NorthernChartWidget(self)
+            chart_widget = NorthernChartWidget(self, input_page=self)
             chart_widget.update_data(self.chart_data)
             
             dialog = ChartDialog(chart_widget, self)

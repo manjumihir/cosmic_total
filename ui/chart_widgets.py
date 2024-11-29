@@ -73,8 +73,9 @@ class NorthernChartWidget(QtWidgets.QWidget):
         'Purva Bhadrapada': 'Jupiter', 'Uttara Bhadrapada': 'Saturn', 'Revati': 'Mercury'
     }
 
-    def __init__(self, parent=None):
+    def __init__(self, parent=None, input_page=None):
         super().__init__(parent)
+        self.input_page = input_page
         self.chart_data = None
         self.transit_data = None  # Add transit data storage
         self.show_transits = False  # Toggle for transit display
@@ -426,32 +427,82 @@ Significance: Represents power and transformation through hardship.''',
         zodiac_system = action.data()
         # Enable/disable ayanamsa menu based on zodiac system
         self.ayanamsa_menu.setEnabled(zodiac_system == "Sidereal")
-        # Emit signal to update calculations
-        self.update()
+        # Recalculate chart with new settings
+        if self.input_page:
+            self.input_page.zodiac_system.setCurrentText(zodiac_system)
+            self.input_page.calculate_chart()
+        else:
+            self.recalculate_chart()
 
     def handle_calc_type_change(self, action):
         """Handle calculation type change"""
         calc_type = action.data()
-        # Emit signal to update calculations
-        self.update()
+        # Recalculate chart with new settings
+        if self.input_page:
+            self.input_page.calc_type.setCurrentText(calc_type)
+            self.input_page.calculate_chart()
+        else:
+            self.recalculate_chart()
 
     def handle_ayanamsa_change(self, action):
         """Handle ayanamsa change"""
         ayanamsa = action.data()
-        # Emit signal to update calculations
-        self.update()
+        # Recalculate chart with new settings
+        if self.input_page:
+            self.input_page.ayanamsa.setCurrentText(ayanamsa)
+            self.input_page.calculate_chart()
+        else:
+            self.recalculate_chart()
 
     def handle_house_change(self, action):
         """Handle house system change"""
         house_system = action.data()
-        # Emit signal to update calculations
-        self.update()
+        # Recalculate chart with new settings
+        if self.input_page:
+            self.input_page.house_system.setCurrentText(house_system)
+            self.input_page.calculate_chart()
+        else:
+            self.recalculate_chart()
 
     def handle_node_change(self, action):
         """Handle node type change"""
         node_type = action.data()
-        # Emit signal to update calculations
-        self.update()
+        # Recalculate chart with new settings
+        if self.input_page:
+            self.input_page.node_type.setCurrentText(node_type)
+            self.input_page.calculate_chart()
+        else:
+            self.recalculate_chart()
+
+    def recalculate_chart(self):
+        """Recalculate chart with current settings"""
+        if not hasattr(self, 'birth_data'):
+            return
+            
+        # Get current settings
+        calc_type = next(action for action in self.calc_type_group.actions() if action.isChecked()).data()
+        zodiac = next(action for action in self.zodiac_group.actions() if action.isChecked()).data()
+        ayanamsa = next(action for action in self.ayanamsa_group.actions() if action.isChecked()).data()
+        house_system = next(action for action in self.house_group.actions() if action.isChecked()).data()
+        node_type = next(action for action in self.node_group.actions() if action.isChecked()).data()
+        
+        # Calculate new chart data
+        try:
+            from utils.astro_calc import AstroCalc
+            astro_calc = AstroCalc()
+            new_data = astro_calc.calculate_chart(
+                dt=self.birth_data['datetime'],
+                lat=self.birth_data['latitude'],
+                lon=self.birth_data['longitude'],
+                calc_type=calc_type,
+                zodiac=zodiac,
+                ayanamsa=ayanamsa,
+                house_system=house_system,
+                node_type=node_type
+            )
+            self.update_data(new_data)
+        except Exception as e:
+            print(f"Error recalculating chart: {e}")
 
     def mouseMoveEvent(self, event):
         """Handle mouse movement to show Nakshatra tooltips"""
@@ -949,7 +1000,7 @@ Significance: Represents power and transformation through hardship.''',
             # Draw lines in green ring only
             x1 = cx + radius * math.cos(angle_rad)        # Outer edge
             y1 = cy - radius * math.sin(angle_rad)
-            x2 = cx + radius * 0.85 * math.cos(angle_rad) # Inner edge
+            x2 = cx + radius * 0.85 * math.cos(angle_rad) # Inner edge of purple ring
             y2 = cy - radius * 0.85 * math.sin(angle_rad)
             
             painter.drawLine(int(x1), int(y1), int(x2), int(y2))
@@ -1426,7 +1477,7 @@ Significance: Represents power and transformation through hardship.''',
                 
                 # Get house cusps as a list using exact longitudes
                 self.house_cusps = [
-                    float(self.houses[f'House_{i}']['longitude'])
+                    float(chart_data['houses'][f'House_{i}']['longitude'])
                     for i in range(1, 13)
                 ]
                 
@@ -1448,7 +1499,7 @@ Significance: Represents power and transformation through hardship.''',
                 else:
                     self.yogeswarananda_container.hide()
                 
-                self.update()
+                self.update()  # Trigger repaint
             else:
                 print(f"Error: Invalid chart data format")
                 print(f"chart_data keys: {chart_data.keys() if isinstance(chart_data, dict) else 'not a dict'}")
@@ -2191,9 +2242,9 @@ class CustomTooltip(QFrame):
             y = global_pos.y() + 40
             
             # Adjust if would go off screen
-            if x + self.width() > screen_geometry.right():
+            if x + self.width() > screen_geometry.right():  # Assuming tooltip width of 350px
                 x = global_pos.x() - self.width() - 40
-            if y + self.height() > screen_geometry.bottom():
+            if y + self.height() > screen_geometry.bottom():  # Assuming tooltip height of 200px
                 y = global_pos.y() - self.height() - 40
             
             self.move(x, y)
@@ -2290,7 +2341,7 @@ def mouseMoveEvent(self, event):
                 angle_diff = abs(chart_angle - planet_angle)
                 if angle_diff > 180:
                     angle_diff = 360 - angle_diff
-                
+                    
                 if angle_diff < 5:  # Within 5 degrees
                     found_planet = True
                     tooltip_text = (f"Planet: {planet}\n"
