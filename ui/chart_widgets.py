@@ -84,6 +84,9 @@ class NorthernChartWidget(QtWidgets.QWidget):
         self.house_cusps = None 
         self.setMinimumSize(500, 500)
         
+        # Initialize planet display with default style
+        self.planet_display = EnhancedPlanetDisplay(style='text', points=None)
+        
         # Enable mouse tracking
         self.setMouseTracking(True)
         self.current_nakshatra = None
@@ -276,10 +279,6 @@ class NorthernChartWidget(QtWidgets.QWidget):
         # Add controls to main layout at the bottom
         self.main_layout.addStretch(1)
         self.main_layout.addWidget(self.controls_container)
-        
-        # Initialize displays with default styles
-        self.planet_display = EnhancedPlanetDisplay(style='basic')
-        self.current_theme = 'Light'
         
         # Load saved preferences
         self.load_preferences()
@@ -663,21 +662,23 @@ Significance: Represents power and transformation through hardship.''',
             self.chart_data = chart_data
             
             # Extract points and houses directly from the dictionary
-            if isinstance(chart_data, dict):
+            if isinstance(chart_data, dict) and 'points' in chart_data:
                 print("Processing chart data dictionary...")
-                # Get points including Ascendant
+                # Initialize points dictionary
                 self.points = {}
-                for point_name, point_data in chart_data.get('points', {}).items():
+                
+                # Process points data
+                points_data = chart_data['points']
+                for point_name, point_data in points_data.items():
                     print(f"Processing point: {point_name}")
                     # Include Ascendant and all planets except outer planets
                     if point_name == 'Ascendant' or point_name in self.PLANET_SYMBOLS:
                         print(f"Adding {point_name} to points dictionary")
-                        self.points[point_name] = {
-                            'longitude': point_data['longitude'],
-                            'sign': point_data['sign'],
-                            'degree': point_data['degree'],
-                            'is_retrograde': point_data.get('is_retrograde', False)
-                        }
+                        self.points[point_name] = point_data.copy()  # Make a copy of the data
+                
+                # Update planet display with new points data
+                current_style = self.planet_display.style if hasattr(self, 'planet_display') else 'text'
+                self.planet_display = EnhancedPlanetDisplay(style=current_style, points=self.points)
                 
                 # Store the full houses data
                 self.houses = chart_data.get('houses', {})
@@ -708,12 +709,13 @@ Significance: Represents power and transformation through hardship.''',
                 
                 self.update()  # Trigger repaint
             else:
-                print(f"Error: chart_data is not a dictionary: {type(chart_data)}")
+                print(f"Error: Invalid chart data format")
+                print(f"chart_data keys: {chart_data.keys() if isinstance(chart_data, dict) else 'not a dict'}")
                 
         except Exception as e:
             print(f"Error updating chart: {str(e)}")
             import traceback
-            traceback.print_exc()  # This will print the full error traceback
+            traceback.print_exc()
 
     def calculate_scale_factors(self, radius):
         """Calculate scaling factors based on chart radius"""
@@ -1472,6 +1474,10 @@ Significance: Represents power and transformation through hardship.''',
                         print(f"Adding {point_name} to points dictionary")
                         self.points[point_name] = point_data.copy()  # Make a copy of the data
                 
+                # Update planet display with new points data
+                current_style = self.planet_display.style if hasattr(self, 'planet_display') else 'text'
+                self.planet_display = EnhancedPlanetDisplay(style=current_style, points=self.points)
+                
                 # Store the full houses data
                 self.houses = chart_data.get('houses', {})
                 
@@ -2042,7 +2048,7 @@ class EnhancedPlanetDisplay:
         painter.save()
         planet_color = self.PLANET_COLORS.get(planet, QtGui.QColor(255, 255, 255))
         
-        if self.style == 'text':
+        if self._style == 'text':
             # Get center of chart for angle calculation
             center_x = painter.device().width() / 2
             center_y = painter.device().height() / 2
@@ -2057,8 +2063,8 @@ class EnhancedPlanetDisplay:
                 name_text = planet
                 
             # Add degree information for text style
-            if self.points and planet in self.points:
-                degree = self.points[planet].get('degree', 0)
+            if self._points and planet in self._points:
+                degree = self._points[planet].get('degree', 0)
                 display_text = f"{name_text} ({degree:.1f}°)"
             else:
                 display_text = name_text
@@ -2078,15 +2084,15 @@ class EnhancedPlanetDisplay:
             text_rect = QtCore.QRect(
                 -int(size * 3),
                 -int(size/2),
-                int(size * 6),  # Added missing closing parenthesis
+                int(size * 6),
                 int(size)
-            )  # Ensure this closing parenthesis is present
+            )
             alignment = Qt.AlignmentFlag.AlignLeft if (-90 <= angle <= 90) else Qt.AlignmentFlag.AlignRight
             painter.drawText(text_rect, alignment, display_text)
             
         else:
             # All other styles (basic, geometric, enhanced, labeled) remain unchanged
-            if self.style == 'basic':
+            if self._style == 'basic':
                 # Basic symbol only
                 painter.setPen(QPen(planet_color, 2))
                 font = QtGui.QFont('Arial', size)
@@ -2095,7 +2101,7 @@ class EnhancedPlanetDisplay:
                                Qt.AlignmentFlag.AlignCenter,
                                self.PLANET_SYMBOLS[planet])
                 
-            elif self.style == 'geometric':
+            elif self._style == 'geometric':
                 # Geometric style remains unchanged
                 painter.setBrush(QtGui.QBrush(planet_color.lighter(150)))
                 painter.setPen(QPen(planet_color, 2))
@@ -2108,7 +2114,7 @@ class EnhancedPlanetDisplay:
                                Qt.AlignmentFlag.AlignCenter,
                                self.PLANET_SYMBOLS[planet])
                 
-            elif self.style == 'enhanced':
+            elif self._style == 'enhanced':
                 # Draw glow effect
                 glow = QtWidgets.QGraphicsDropShadowEffect()
                 glow.setColor(planet_color)
@@ -2127,7 +2133,7 @@ class EnhancedPlanetDisplay:
                                Qt.AlignmentFlag.AlignCenter,
                                self.PLANET_SYMBOLS[planet])
                 
-            elif self.style == 'labeled':
+            elif self._style == 'labeled':
                 # Draw background circle
                 painter.setBrush(QtGui.QBrush(planet_color.lighter(170)))
                 painter.setPen(QPen(planet_color, 2))
