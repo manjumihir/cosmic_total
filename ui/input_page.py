@@ -16,12 +16,14 @@ from PyQt6 import QtGui
 from .yogeswarananada_window import YogeswarananadaWindow
 from .chart_widgets import NorthernChartWidget
 from .chart_dialog import ChartDialog
+from .results_window import ResultsWindow
 
 class InputPage(QWidget):
     def __init__(self):
         super().__init__()
         self.astro_calc = AstroCalc()
         self.chart_data = None
+        self.results_window = None
         self.init_ui()
         
     def decimal_to_dms(self, decimal, is_latitude=True):
@@ -184,217 +186,248 @@ class InputPage(QWidget):
             return False
     
     def init_ui(self):
-        # Create main layout
+        # Create main layout with proper margins
         main_layout = QVBoxLayout()
+        main_layout.setContentsMargins(20, 20, 20, 20)
+        main_layout.setSpacing(15)
         
-        # Create a widget for input fields
-        input_widget = QWidget()
-        input_layout = QVBoxLayout()
+        # Create scroll area for all content
+        scroll = QScrollArea()
+        scroll.setWidgetResizable(True)
+        scroll.setStyleSheet("QScrollArea { border: none; }")
         
-        # Name input
+        # Main container widget
+        container = QWidget()
+        container_layout = QVBoxLayout()
+        container_layout.setSpacing(20)
+        
+        # Personal Information Group
+        personal_group = QGroupBox("Personal Information")
+        personal_group.setStyleSheet("QGroupBox { font-weight: bold; }")
+        personal_layout = QVBoxLayout()
+        personal_layout.setSpacing(10)
+        
+        # Name input with proper spacing
         name_layout = QHBoxLayout()
-        name_layout.addWidget(QLabel("Name:"))
+        name_label = QLabel("Name:")
+        name_label.setMinimumWidth(100)
         self.name_input = QLineEdit()
+        name_layout.addWidget(name_label)
         name_layout.addWidget(self.name_input)
-        input_layout.addLayout(name_layout)
+        personal_layout.addLayout(name_layout)
         
         # DateTime input
         date_layout = QHBoxLayout()
-        date_layout.addWidget(QLabel("Birth Date & Time:"))
+        date_label = QLabel("Birth Date & Time:")
+        date_label.setMinimumWidth(100)
         self.date_time = QDateTimeEdit()
         self.date_time.setDateTime(QDateTime.currentDateTime())
         self.date_time.setDisplayFormat("dd/MM/yyyy hh:mm")
+        self.date_time.setCalendarPopup(True)
+        date_layout.addWidget(date_label)
         date_layout.addWidget(self.date_time)
-        input_layout.addLayout(date_layout)
+        personal_layout.addLayout(date_layout)
         
-        # City input with search button
+        personal_group.setLayout(personal_layout)
+        container_layout.addWidget(personal_group)
+        
+        # Location Group
+        location_group = QGroupBox("Location Information")
+        location_group.setStyleSheet("QGroupBox { font-weight: bold; }")
+        location_layout = QVBoxLayout()
+        location_layout.setSpacing(10)
+        
+        # City input with search
         city_layout = QHBoxLayout()
-        city_layout.addWidget(QLabel("City:"))
+        city_label = QLabel("City:")
+        city_label.setMinimumWidth(100)
         self.city_input = QLineEdit()
-        city_layout.addWidget(self.city_input)
         search_btn = QPushButton("Search")
+        search_btn.setMaximumWidth(100)
         search_btn.clicked.connect(self.fetch_coordinates)
+        city_layout.addWidget(city_label)
+        city_layout.addWidget(self.city_input)
         city_layout.addWidget(search_btn)
-        input_layout.addLayout(city_layout)
+        location_layout.addLayout(city_layout)
         
-        # Lat/Long inputs with tooltips
+        # Coordinates
         coords_layout = QHBoxLayout()
-        coords_layout.addWidget(QLabel("Latitude:"))
+        # Latitude
+        lat_layout = QHBoxLayout()
+        lat_label = QLabel("Latitude:")
+        lat_label.setMinimumWidth(100)
         self.lat_input = QLineEdit()
-        self.lat_input.setToolTip("Format: DD° MM' N/S or DD° MM' SS\" N/S\nExample: 40° 26' N or 40° 26' 46\" N")
+        self.lat_input.setToolTip("Format: DD° MM' N/S or DD° MM' SS\" N/S\nExample: 40° 26' N")
         self.lat_input.setPlaceholderText("e.g., 40° 26' N")
         self.lat_input.editingFinished.connect(lambda: self.validate_dms_input(self.lat_input, True))
-        coords_layout.addWidget(self.lat_input)
+        lat_layout.addWidget(lat_label)
+        lat_layout.addWidget(self.lat_input)
         
-        coords_layout.addWidget(QLabel("Longitude:"))
+        # Longitude
+        lon_layout = QHBoxLayout()
+        lon_label = QLabel("Longitude:")
+        lon_label.setMinimumWidth(100)
         self.long_input = QLineEdit()
-        self.long_input.setToolTip("Format: DD° MM' E/W or DD° MM' SS\" E/W\nExample: 73° 58' W or 73° 58' 33\" W")
+        self.long_input.setToolTip("Format: DD° MM' E/W or DD° MM' SS\" E/W\nExample: 73° 58' W")
         self.long_input.setPlaceholderText("e.g., 73° 58' W")
         self.long_input.editingFinished.connect(lambda: self.validate_dms_input(self.long_input, False))
-        coords_layout.addWidget(self.long_input)
-        input_layout.addLayout(coords_layout)
+        lon_layout.addWidget(lon_label)
+        lon_layout.addWidget(self.long_input)
         
-        # Add Calculate button
-        calc_btn = QPushButton("Calculate Chart")
-        calc_btn.clicked.connect(self.calculate_chart)
-        input_layout.addWidget(calc_btn)
+        coords_layout.addLayout(lat_layout)
+        coords_layout.addLayout(lon_layout)
+        location_layout.addLayout(coords_layout)
         
-        # Add Settings Section
+        location_group.setLayout(location_layout)
+        container_layout.addWidget(location_group)
+        
+        # Calculation Settings Group
         settings_group = QGroupBox("Calculation Settings")
+        settings_group.setStyleSheet("QGroupBox { font-weight: bold; }")
         settings_layout = QVBoxLayout()
+        settings_layout.setSpacing(10)
         
-        # Calculation Type (Geocentric vs Topocentric)
+        # Create two columns for settings
+        settings_columns = QHBoxLayout()
+        left_column = QVBoxLayout()
+        right_column = QVBoxLayout()
+        
+        # Left Column Settings
+        # Calculation Type
         calc_type_layout = QHBoxLayout()
-        calc_type_layout.addWidget(QLabel("Calculation Type:"))
+        calc_type_label = QLabel("Calculation Type:")
+        calc_type_label.setMinimumWidth(120)
         self.calc_type = QComboBox()
         self.calc_type.addItems(["Geocentric", "Topocentric"])
-        self.calc_type.setToolTip(
-            "Geocentric: Calculated from Earth's center\n"
-            "Topocentric: Calculated from the exact birth location"
-        )
+        self.calc_type.setToolTip("Geocentric: Earth's center\nTopocentric: Birth location")
+        calc_type_layout.addWidget(calc_type_label)
         calc_type_layout.addWidget(self.calc_type)
-        settings_layout.addLayout(calc_type_layout)
+        left_column.addLayout(calc_type_layout)
         
         # Zodiac System
         zodiac_layout = QHBoxLayout()
-        zodiac_layout.addWidget(QLabel("Zodiac System:"))
+        zodiac_label = QLabel("Zodiac System:")
+        zodiac_label.setMinimumWidth(120)
         self.zodiac_system = QComboBox()
         self.zodiac_system.addItems(["Tropical", "Sidereal"])
         self.zodiac_system.setCurrentText("Sidereal")
+        zodiac_layout.addWidget(zodiac_label)
         zodiac_layout.addWidget(self.zodiac_system)
-        settings_layout.addLayout(zodiac_layout)
+        left_column.addLayout(zodiac_layout)
         
-        # Ayanamsa (enabled for Sidereal)
+        # Ayanamsa
         ayanamsa_layout = QHBoxLayout()
-        ayanamsa_layout.addWidget(QLabel("Ayanamsa:"))
+        ayanamsa_label = QLabel("Ayanamsa:")
+        ayanamsa_label.setMinimumWidth(120)
         self.ayanamsa = QComboBox()
-        self.ayanamsa.addItems([
-            "Lahiri",
-            "Raman",
-            "Krishnamurti",
-            "Fagan/Bradley",
-            "True Chitrapaksha"
-        ])
-        self.ayanamsa.setEnabled(True)
+        self.ayanamsa.addItems(["Lahiri", "Raman", "Krishnamurti", "Fagan/Bradley", "True Chitrapaksha"])
+        ayanamsa_layout.addWidget(ayanamsa_label)
         ayanamsa_layout.addWidget(self.ayanamsa)
-        settings_layout.addLayout(ayanamsa_layout)
+        left_column.addLayout(ayanamsa_layout)
+        
+        # Right Column Settings
+        # House System
+        house_layout = QHBoxLayout()
+        house_label = QLabel("House System:")
+        house_label.setMinimumWidth(120)
+        self.house_system = QComboBox()
+        self.house_system.addItems([
+            "Placidus", "Koch", "Equal (Asc)", "Equal (MC)", "Whole Sign",
+            "Campanus", "Regiomontanus", "Porphyry", "Morinus", "Meridian",
+            "Alcabitius", "Azimuthal", "Polich/Page (Topocentric)", "Vehlow Equal"
+        ])
+        house_layout.addWidget(house_label)
+        house_layout.addWidget(self.house_system)
+        right_column.addLayout(house_layout)
+        
+        # Node Type
+        node_layout = QHBoxLayout()
+        node_label = QLabel("Node Type:")
+        node_label.setMinimumWidth(120)
+        self.node_type = QComboBox()
+        self.node_type.addItems(["True Node (Rahu/Ketu)", "Mean Node (Rahu/Ketu)"])
+        node_layout.addWidget(node_label)
+        node_layout.addWidget(self.node_type)
+        right_column.addLayout(node_layout)
+        
+        # Add columns to settings layout
+        settings_columns.addLayout(left_column)
+        settings_columns.addLayout(right_column)
+        settings_layout.addLayout(settings_columns)
+        
+        settings_group.setLayout(settings_layout)
+        container_layout.addWidget(settings_group)
+        
+        # Actions Group
+        actions_group = QGroupBox("Actions")
+        actions_group.setStyleSheet("QGroupBox { font-weight: bold; }")
+        actions_layout = QVBoxLayout()
+        
+        # Primary actions
+        primary_actions = QHBoxLayout()
+        
+        # Calculate button with prominence
+        calc_btn = QPushButton("Calculate Chart")
+        calc_btn.setStyleSheet("""
+            QPushButton {
+                background-color: #6B4EAE;
+                color: white;
+                padding: 8px 16px;
+                border-radius: 4px;
+                font-weight: bold;
+            }
+            QPushButton:hover {
+                background-color: #563D8C;
+            }
+        """)
+        calc_btn.clicked.connect(self.calculate_chart)
+        primary_actions.addWidget(calc_btn)
+        
+        # Secondary actions
+        secondary_actions = QHBoxLayout()
+        secondary_actions.setSpacing(10)
+        
+        # Profile management buttons
+        self.save_btn = QPushButton("Save Profile")
+        self.open_btn = QPushButton("Open Profile")
+        self.dashas_btn = QPushButton("Show Dashas")
+        self.yogeswarananada_btn = QPushButton("Yogeswarananada")
+        
+        for btn in [self.save_btn, self.open_btn, self.dashas_btn, self.yogeswarananada_btn]:
+            btn.setStyleSheet("""
+                QPushButton {
+                    padding: 6px 12px;
+                    border: 1px solid #6B4EAE;
+                    border-radius: 4px;
+                    color: #6B4EAE;
+                }
+                QPushButton:hover {
+                    background-color: #F0E6FF;
+                }
+            """)
+            secondary_actions.addWidget(btn)
+        
+        self.save_btn.clicked.connect(self.save_profile)
+        self.open_btn.clicked.connect(self.open_profile)
+        self.dashas_btn.clicked.connect(self.show_dashas)
+        self.yogeswarananada_btn.clicked.connect(self.yogeswarananada_handler)
+        
+        actions_layout.addLayout(primary_actions)
+        actions_layout.addLayout(secondary_actions)
+        actions_group.setLayout(actions_layout)
+        container_layout.addWidget(actions_group)
+        
+        # Set up the container
+        container.setLayout(container_layout)
+        scroll.setWidget(container)
+        
+        # Add everything to main layout
+        main_layout.addWidget(scroll)
         
         # Connect zodiac system change to ayanamsa enablement
         self.zodiac_system.currentTextChanged.connect(
             lambda text: self.ayanamsa.setEnabled(text == "Sidereal")
         )
-        
-        # House System
-        house_layout = QHBoxLayout()
-        house_layout.addWidget(QLabel("House System:"))
-        self.house_system = QComboBox()
-        self.house_system.addItems([
-            "Placidus",
-            "Koch",
-            "Equal (Asc)",
-            "Equal (MC)",
-            "Whole Sign",
-            "Campanus",
-            "Regiomontanus",
-            "Porphyry",
-            "Morinus",
-            "Meridian",
-            "Alcabitius",
-            "Azimuthal",
-            "Polich/Page (Topocentric)",
-            "Vehlow Equal"
-        ])
-        # Add tooltips for house systems
-        self.house_system.setToolTip(
-            "Placidus: Traditional western system using time-based division\n"
-            "Koch: Similar to Placidus, uses spatial division\n"
-            "Equal (Asc): 30° houses starting from Ascendant\n"
-            "Equal (MC): 30° houses starting from MC\n"
-            "Whole Sign: Each house equals one complete sign\n"
-            "Campanus: Uses prime vertical for division\n"
-            "Regiomontanus: Uses celestial equator\n"
-            "Porphyry: Trisection of quadrants\n"
-            "Morinus: Uses equatorial ascensions\n"
-            "Meridian: Uses meridian system\n"
-            "Alcabitius: Semi-arc system\n"
-            "Azimuthal: Uses horizon coordinate system\n"
-            "Polich/Page: True local space houses\n"
-            "Vehlow Equal: Equal houses with 15° shift"
-        )
-        house_layout.addWidget(self.house_system)
-        settings_layout.addLayout(house_layout)
-        
-        # Node Type
-        node_type_layout = QHBoxLayout()
-        node_type_layout.addWidget(QLabel("Node Type:"))
-        self.node_type = QComboBox()
-        self.node_type.addItems([
-            "True Node (Rahu/Ketu)", 
-            "Mean Node (Rahu/Ketu)"
-        ])
-        self.node_type.setToolTip(
-            "True Node: Actual position including perturbations\n"
-            "Mean Node: Average position without perturbations"
-        )
-        node_type_layout.addWidget(self.node_type)
-        settings_layout.addLayout(node_type_layout)
-        
-        settings_group.setLayout(settings_layout)
-        input_layout.addWidget(settings_group)
-        
-        # Buttons
-        button_layout = QHBoxLayout()
-        self.fetch_coords_btn = QPushButton("Fetch Coordinates")
-        self.fetch_coords_btn.clicked.connect(self.fetch_coordinates)
-        button_layout.addWidget(self.fetch_coords_btn)
-        
-        self.save_btn = QPushButton("Save Profile")
-        self.save_btn.clicked.connect(self.save_profile)
-        button_layout.addWidget(self.save_btn)
-        
-        self.open_btn = QPushButton("Open Profile")
-        self.open_btn.clicked.connect(self.open_profile)
-        button_layout.addWidget(self.open_btn)
-        
-        self.dashas_btn = QPushButton("Show Dashas")
-        self.dashas_btn.clicked.connect(self.show_dashas)
-        button_layout.addWidget(self.dashas_btn)
-        
-        # Add the new yogeswarananada_12 button
-        self.yogeswarananada_btn = QPushButton("yogeswarananada_12")
-        self.yogeswarananada_btn.clicked.connect(self.yogeswarananada_handler)
-        button_layout.addWidget(self.yogeswarananada_btn)
-        
-        input_layout.addLayout(button_layout)
-        
-        input_widget.setLayout(input_layout)
-        
-        # Create scroll area for results but don't add it to layout yet
-        self.results_scroll = QScrollArea()
-        self.results_scroll.setWidgetResizable(True)
-        self.results_scroll.setMinimumHeight(300)
-        
-        # Create text widget for results
-        self.results_text = QTextEdit()
-        self.results_text.setReadOnly(True)
-        
-        # Set text widget as scroll area's widget
-        self.results_scroll.setWidget(self.results_text)
-        self.results_scroll.hide()  # Hide it initially
-        
-        # Add widgets to main layout
-        main_layout.addWidget(input_widget)
-        main_layout.addWidget(self.results_scroll)  # Still add it to layout, but it's hidden
-        
-        # Initialize charts with empty data but don't update until we have real data
-        self.northern_chart = NorthernChartWidget()
-        
-        # Add to layout
-        self.chart_stack = QStackedWidget()
-        self.chart_stack.addWidget(self.northern_chart)
-        self.chart_stack.hide()
-        
-        main_layout.addWidget(self.chart_stack)
         
         self.setLayout(main_layout)
 
@@ -602,8 +635,15 @@ class InputPage(QWidget):
             self.yogeswarananada_btn.setEnabled(True)
             self.dashas_btn.setEnabled(True)
             
-            # Update the main display
-            self.display_results(self.chart_data)
+            # Create or show results window
+            if not self.results_window:
+                self.results_window = ResultsWindow(self)
+            
+            # Generate and display results
+            html_content = self.generate_html_results(self.chart_data)
+            self.results_window.set_html_content(html_content)
+            self.results_window.show()
+            self.results_window.raise_()  # Bring window to front
             
             # Find existing chart dialog
             existing_dialog = None
@@ -628,90 +668,175 @@ class InputPage(QWidget):
             self.yogeswarananada_btn.setEnabled(False)
             self.dashas_btn.setEnabled(False)
 
-    def display_results(self, chart_data):
-        """Display the calculation results."""
+    def generate_html_results(self, chart_data):
+        """Generate HTML formatted results."""
         try:
-            # Show the results area first
-            self.results_scroll.show()
+            # Create HTML template with CSS styling
+            html_output = """
+            <html>
+            <head>
+                <style>
+                    body {
+                        font-family: 'Segoe UI', Arial, sans-serif;
+                        line-height: 1.6;
+                        color: #FFFFFF;
+                        padding: 20px;
+                        background-color: #000000;
+                    }
+                    .header {
+                        background: #1A1A1A;
+                        color: white;
+                        padding: 15px;
+                        border-radius: 8px;
+                        margin-bottom: 20px;
+                        border: 1px solid #333333;
+                    }
+                    .section {
+                        background: #1A1A1A;
+                        border: 1px solid #333333;
+                        border-radius: 8px;
+                        padding: 15px;
+                        margin-bottom: 20px;
+                    }
+                    .section-title {
+                        color: #FFFFFF;
+                        border-bottom: 2px solid #333333;
+                        padding-bottom: 5px;
+                        margin-bottom: 15px;
+                        font-weight: bold;
+                    }
+                    table {
+                        width: 100%;
+                        border-collapse: collapse;
+                        margin-bottom: 15px;
+                    }
+                    th, td {
+                        padding: 8px;
+                        text-align: left;
+                        border: 1px solid #333333;
+                    }
+                    th {
+                        background: #262626;
+                        color: #FFFFFF;
+                        font-weight: bold;
+                    }
+                    tr:nth-child(even) {
+                        background: #1F1F1F;
+                    }
+                    tr:nth-child(odd) {
+                        background: #262626;
+                    }
+                    .planet-card, .house-card {
+                        background: #1F1F1F;
+                        border: 1px solid #333333;
+                        border-radius: 6px;
+                        padding: 10px;
+                        margin-bottom: 10px;
+                    }
+                    .settings-item {
+                        display: inline-block;
+                        background: #262626;
+                        border-radius: 4px;
+                        padding: 5px 10px;
+                        margin: 5px;
+                        border: 1px solid #333333;
+                    }
+                    .retrograde {
+                        color: #FF6B6B;
+                        font-weight: bold;
+                    }
+                    .coordinates {
+                        color: #66B2FF;
+                        font-weight: 500;
+                    }
+                </style>
+            </head>
+            <body>
+            """
             
-            # Add debug logging at the start
-            print("Debug - Full chart_data:", json.dumps(chart_data, indent=2))
+            # Header Section
+            html_output += f"""
+            <div class="header">
+                <h2>Astrological Chart for {self.name_input.text()}</h2>
+                <p>Date & Time: {chart_data['meta']['datetime']}</p>
+                <p>Location: {self.city_input.text()} 
+                   <span class="coordinates">({self.decimal_to_dms(float(chart_data['meta']['latitude']), True)}, 
+                   {self.decimal_to_dms(float(chart_data['meta']['longitude']), False)})</span>
+                </p>
+            </div>
+            """
             
-            # Create a formatted text output
-            output = f"Calculations for {self.name_input.text()}\n"
-            output += f"Date & Time: {chart_data['meta']['datetime']}\n"
+            # Planetary Positions Section
+            html_output += '<div class="section"><h3 class="section-title">Planetary Positions</h3>'
+            html_output += '<table>'
+            html_output += '<tr><th>Planet</th><th>Sign & Position</th><th>House</th><th>Nakshatra</th><th>Lords</th><th>Status</th></tr>'
             
-            # Convert coordinates to DMS format for display
-            lat = float(chart_data['meta']['latitude'])
-            lon = float(chart_data['meta']['longitude'])
-            lat_dms = self.decimal_to_dms(lat, True)
-            lon_dms = self.decimal_to_dms(lon, False)
-            output += f"Location: {self.city_input.text()} ({lat_dms}, {lon_dms})\n\n"
-            
-            output += "Planetary Positions:\n"
-            output += "-------------------\n"
-            
-            # Display points in a specific order
             display_order = [
                 "Ascendant", "Sun", "Moon", "Mars", "Mercury", "Jupiter", 
                 "Venus", "Saturn", "Rahu", "Ketu", "Uranus", "Neptune", "Pluto"
             ]
             
-            # Display planetary positions
             for point in display_order:
                 if point in chart_data['points']:
                     data = chart_data['points'][point]
-                    output += f"{point}:\n"
-                    output += f"  Sign: {data['sign']} {self.decimal_to_dms(data['degree'])} (House {data['house']})\n"
+                    html_output += '<tr>'
+                    html_output += f'<td>{point}</td>'
+                    html_output += f'<td>{data["sign"]} {self.decimal_to_dms(data["degree"])}</td>'
+                    html_output += f'<td>{data["house"]}</td>'
                     
-                    # Add nakshatra details if available
                     if 'nakshatra' in data:
-                        output += f"  Nakshatra: {data['nakshatra']} (Pada {data['pada']})\n"
-                        output += f"  Star Lord: {data['star_lord']}\n"
-                        output += f"  Sub Lord: {data['sub_lord']}\n"
+                        html_output += f'<td>{data["nakshatra"]} (Pada {data["pada"]})</td>'
+                        html_output += f'<td>Star: {data["star_lord"]}<br>Sub: {data["sub_lord"]}</td>'
+                    else:
+                        html_output += '<td>-</td><td>-</td>'
                     
-                    # Add retrograde status if available
+                    status = []
                     if 'is_retrograde' in data and data['is_retrograde']:
-                        output += "  Status: Retrograde\n"
-                    
-                    # Add node type if available
+                        status.append('<span class="retrograde">Retrograde</span>')
                     if 'type' in data:
-                        output += f"  Type: {data['type']}\n"
+                        status.append(data["type"])
+                    html_output += f'<td>{" ".join(status) if status else "-"}</td>'
                     
-                    output += "\n"
+                    html_output += '</tr>'
             
-            # Add debug logging before house cusps
-            print("Debug - Houses data:", json.dumps(chart_data.get('houses', {}), indent=2))
+            html_output += '</table></div>'
             
-            # Add House Cusps section with lords
-            output += "\nHouse Cusps:\n"
-            output += "------------\n"
+            # House Cusps Section
+            html_output += '<div class="section"><h3 class="section-title">House Cusps</h3>'
+            html_output += '<table>'
+            html_output += '<tr><th>House</th><th>Sign & Position</th><th>Nakshatra</th><th>Star Lord</th><th>Sub Lord</th></tr>'
+            
             for house in range(1, 13):
                 house_key = f"House_{house}"
                 if house_key in chart_data.get('houses', {}):
                     house_data = chart_data['houses'][house_key]
-                    output += f"House {house}:\n"
-                    output += f"  Longitude: {self.decimal_to_dms(house_data['longitude'])}\n"
-                    output += f"  Sign: {house_data['sign']} {self.decimal_to_dms(house_data['degree'])}\n"
-                    output += f"  Nakshatra: {house_data['nakshatra']} (Pada {house_data['pada']})\n"
-                    output += f"  Star Lord: {house_data['star_lord']}\n"
-                    output += f"  Sub Lord: {house_data['sub_lord']}\n\n"
+                    html_output += '<tr>'
+                    html_output += f'<td>{house}</td>'
+                    html_output += f'<td>{house_data["sign"]} {self.decimal_to_dms(house_data["degree"])}</td>'
+                    html_output += f'<td>{house_data["nakshatra"]} (Pada {house_data["pada"]})</td>'
+                    html_output += f'<td>{house_data["star_lord"]}</td>'
+                    html_output += f'<td>{house_data["sub_lord"]}</td>'
+                    html_output += '</tr>'
             
-            # Add calculation settings
-            output += "Calculation Settings:\n"
-            output += "-------------------\n"
-            output += f"Calculation Type: {self.calc_type.currentText()}\n"
-            output += f"Zodiac System: {self.zodiac_system.currentText()}\n"
-            output += f"Ayanamsa: {self.ayanamsa.currentText()}\n"
-            output += f"House System: {self.house_system.currentText()}\n"
-            output += f"Node Type: {self.node_type.currentText()}\n"
+            html_output += '</table></div>'
             
-            # Display the results in the QTextEdit widget instead of popup
-            self.results_text.setText(output)
+            # Settings Section
+            html_output += '<div class="section"><h3 class="section-title">Calculation Settings</h3>'
+            html_output += '<div class="settings-container">'
+            html_output += f'<span class="settings-item">Calculation Type: {self.calc_type.currentText()}</span>'
+            html_output += f'<span class="settings-item">Zodiac System: {self.zodiac_system.currentText()}</span>'
+            html_output += f'<span class="settings-item">Ayanamsa: {self.ayanamsa.currentText()}</span>'
+            html_output += f'<span class="settings-item">House System: {self.house_system.currentText()}</span>'
+            html_output += f'<span class="settings-item">Node Type: {self.node_type.currentText()}</span>'
+            html_output += '</div></div>'
+            
+            html_output += '</body></html>'
+            
+            return html_output
             
         except Exception as e:
-            print(f"Debug - Error in display_results: {str(e)}")
-            QMessageBox.warning(self, "Error", f"Failed to display results: {str(e)}")
+            print(f"Debug - Error generating HTML results: {str(e)}")
+            raise
 
     def show_dashas(self):
         """Display dasha periods in a nested tree format with current period highlighted"""
