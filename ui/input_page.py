@@ -575,7 +575,7 @@ class InputPage(QWidget):
                     # Try decimal format as fallback
                     latitude = float(lat_text)
                     longitude = float(lon_text)
-                
+            
                 # Validate ranges
                 if abs(latitude) > 90:
                     raise ValueError("Latitude must be between 90°N and 90°S")
@@ -608,7 +608,7 @@ class InputPage(QWidget):
             # Find existing chart dialog
             existing_dialog = None
             for widget in QApplication.topLevelWidgets():
-                if isinstance(widget, ChartDialog):
+                if isinstance(widget, ChartDialog) and not widget.isHidden():
                     existing_dialog = widget
                     break
             
