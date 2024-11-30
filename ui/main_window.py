@@ -7,6 +7,7 @@ class MainWindow(QMainWindow):
     def __init__(self):
         super().__init__()
         self.setWindowTitle("Birth Data Input")
+        self.setMinimumWidth(900)  # Set minimum width for the window
         
         # Create stacked widget to manage multiple pages
         self.stacked_widget = QStackedWidget()

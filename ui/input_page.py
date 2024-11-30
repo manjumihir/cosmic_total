@@ -198,6 +198,7 @@ class InputPage(QWidget):
         
         # Main container widget
         container = QWidget()
+        container.setMinimumWidth(800)  # Set minimum width for container
         container_layout = QVBoxLayout()
         container_layout.setSpacing(20)
         
@@ -257,6 +258,7 @@ class InputPage(QWidget):
         lat_label = QLabel("Latitude:")
         lat_label.setMinimumWidth(100)
         self.lat_input = QLineEdit()
+        self.lat_input.setMinimumWidth(200)  # Set minimum width for input
         self.lat_input.setToolTip("Format: DD° MM' N/S or DD° MM' SS\" N/S\nExample: 40° 26' N")
         self.lat_input.setPlaceholderText("e.g., 40° 26' N")
         self.lat_input.editingFinished.connect(lambda: self.validate_dms_input(self.lat_input, True))
@@ -268,6 +270,7 @@ class InputPage(QWidget):
         lon_label = QLabel("Longitude:")
         lon_label.setMinimumWidth(100)
         self.long_input = QLineEdit()
+        self.long_input.setMinimumWidth(200)  # Set minimum width for input
         self.long_input.setToolTip("Format: DD° MM' E/W or DD° MM' SS\" E/W\nExample: 73° 58' W")
         self.long_input.setPlaceholderText("e.g., 73° 58' W")
         self.long_input.editingFinished.connect(lambda: self.validate_dms_input(self.long_input, False))
@@ -300,6 +303,7 @@ class InputPage(QWidget):
         self.calc_type = QComboBox()
         self.calc_type.addItems(["Geocentric", "Topocentric"])
         self.calc_type.setToolTip("Geocentric: Earth's center\nTopocentric: Birth location")
+        self.calc_type.setMinimumWidth(200)  # Set minimum width for combo box
         calc_type_layout.addWidget(calc_type_label)
         calc_type_layout.addWidget(self.calc_type)
         left_column.addLayout(calc_type_layout)
@@ -311,6 +315,7 @@ class InputPage(QWidget):
         self.zodiac_system = QComboBox()
         self.zodiac_system.addItems(["Tropical", "Sidereal"])
         self.zodiac_system.setCurrentText("Sidereal")
+        self.zodiac_system.setMinimumWidth(200)  # Set minimum width for combo box
         zodiac_layout.addWidget(zodiac_label)
         zodiac_layout.addWidget(self.zodiac_system)
         left_column.addLayout(zodiac_layout)
@@ -321,6 +326,7 @@ class InputPage(QWidget):
         ayanamsa_label.setMinimumWidth(120)
         self.ayanamsa = QComboBox()
         self.ayanamsa.addItems(["Lahiri", "Raman", "Krishnamurti", "Fagan/Bradley", "True Chitrapaksha"])
+        self.ayanamsa.setMinimumWidth(200)  # Set minimum width for combo box
         ayanamsa_layout.addWidget(ayanamsa_label)
         ayanamsa_layout.addWidget(self.ayanamsa)
         left_column.addLayout(ayanamsa_layout)
@@ -336,6 +342,7 @@ class InputPage(QWidget):
             "Campanus", "Regiomontanus", "Porphyry", "Morinus", "Meridian",
             "Alcabitius", "Azimuthal", "Polich/Page (Topocentric)", "Vehlow Equal"
         ])
+        self.house_system.setMinimumWidth(200)  # Set minimum width for combo box
         house_layout.addWidget(house_label)
         house_layout.addWidget(self.house_system)
         right_column.addLayout(house_layout)
@@ -346,6 +353,7 @@ class InputPage(QWidget):
         node_label.setMinimumWidth(120)
         self.node_type = QComboBox()
         self.node_type.addItems(["True Node (Rahu/Ketu)", "Mean Node (Rahu/Ketu)"])
+        self.node_type.setMinimumWidth(200)  # Set minimum width for combo box
         node_layout.addWidget(node_label)
         node_layout.addWidget(self.node_type)
         right_column.addLayout(node_layout)
