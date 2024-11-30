@@ -13,7 +13,7 @@ import json
 from utils.astro_calc import AstroCalc, DashaCalculator
 from datetime import datetime
 from PyQt6 import QtGui
-from .yogeswarananada_window import YogeswarananadaWindow
+from .yogeswarananda_window import YogeswarananadaWindow
 from .chart_widgets import NorthernChartWidget
 from .chart_dialog import ChartDialog
 from .results_window import ResultsWindow
@@ -777,7 +777,7 @@ class InputPage(QWidget):
             # Planetary Positions Section
             html_output += '<div class="section"><h3 class="section-title">Planetary Positions</h3>'
             html_output += '<table>'
-            html_output += '<tr><th>Planet</th><th>Sign & Position</th><th>House</th><th>Nakshatra</th><th>Lords</th><th>Status</th></tr>'
+            html_output += '<tr><th>Planet</th><th>Sign & Position</th><th>House</th><th>Nakshatra</th><th>Star Lord</th><th>Sub Lord</th><th>Status</th></tr>'
             
             display_order = [
                 "Ascendant", "Sun", "Moon", "Mars", "Mercury", "Jupiter", 
@@ -794,9 +794,10 @@ class InputPage(QWidget):
                     
                     if 'nakshatra' in data:
                         html_output += f'<td>{data["nakshatra"]} (Pada {data["pada"]})</td>'
-                        html_output += f'<td>Star: {data["star_lord"]}<br>Sub: {data["sub_lord"]}</td>'
+                        html_output += f'<td>{data["star_lord"]}</td>'
+                        html_output += f'<td>{data["sub_lord"]}</td>'
                     else:
-                        html_output += '<td>-</td><td>-</td>'
+                        html_output += '<td>-</td><td>-</td><td>-</td>'
                     
                     status = []
                     if 'is_retrograde' in data and data['is_retrograde']:
