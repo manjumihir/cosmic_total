@@ -5,3 +5,6 @@
 {"name": "mihir", "datetime": "20/12/1969 22:55", "city": "bhubaneswar, india", "latitude": "20\u00b0 15' 37\" N", "longitude": "85\u00b0 50' 22\" E", "latitude_decimal": 20.260277777777777, "longitude_decimal": 85.83944444444444}
 {"name": "mihir1", "datetime": "20/12/1969 22:55", "city": "bhubaneswar, india", "latitude": "20\u00b0 15' 37\" N", "longitude": "85\u00b0 50' 22\" E", "latitude_decimal": 20.260277777777777, "longitude_decimal": 85.83944444444444}
 {"name": "mihir1", "datetime": "20/12/1969 22:55", "city": "bhubaneswar, india", "latitude": "20\u00b0 14' 00\" N", "longitude": "85\u00b0 50' 00\" E", "latitude_decimal": 20.233333333333334, "longitude_decimal": 85.83333333333333}
+{"name": "puri1", "datetime": "01/12/1962 19:52", "city": "puri, india", "latitude": "19\u00b0 48' 00\" N", "longitude": "85\u00b0 51' 00\" E", "latitude_decimal": 19.8, "longitude_decimal": 85.85}
+{"name": "puri2", "datetime": "15/06/2011 13:50", "city": "puri, india", "latitude": "19\u00b0 48' 00\" N", "longitude": "85\u00b0 51' 00\" E", "latitude_decimal": 19.8, "longitude_decimal": 85.85}
+{"name": "puri2", "datetime": "12/06/2011 10:33", "city": "puri, india", "latitude": "19\u00b0 48' 00\" N", "longitude": "85\u00b0 51' 00\" E", "latitude_decimal": 19.8, "longitude_decimal": 85.85}

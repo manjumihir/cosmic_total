@@ -403,28 +403,52 @@ class DashaCalculator:
     def calculate_dashas(self, birth_date, moon_longitude):
         """Calculate all five levels of dashas"""
         try:
+            # Calculate nakshatra and balance
             nakshatra_degree = moon_longitude % 13.333333
-            balance = 1 - (nakshatra_degree / 13.333333)
+            elapsed_fraction = nakshatra_degree / 13.333333
             nakshatra_number = int(moon_longitude / 13.333333)
             start_lord_index = nakshatra_number % 9
-
+            
+            # Get the current dasha lord at birth
+            current_lord = self.dasha_order[start_lord_index]
+            total_dasha_minutes = self.dasha_years[current_lord] * 525600  # Full dasha period in minutes
+            
+            # Calculate elapsed and remaining time in current dasha
+            elapsed_minutes = int(total_dasha_minutes * elapsed_fraction)
+            remaining_minutes = total_dasha_minutes - elapsed_minutes
+            
+            # Calculate the start date of the current dasha
+            dasha_start_date = birth_date - timedelta(minutes=elapsed_minutes)
+            
             all_dashas = []
-            current_date = birth_date
+            current_date = dasha_start_date
 
-            # Mahadasha calculation
-            for i in range(9):
+            # First add the current dasha with remaining time
+            end_date = self.add_period_to_datetime(birth_date, remaining_minutes)
+            years, months, days, hours, mins = self.calculate_period(remaining_minutes)
+            duration_str = self.format_duration(years, months, days, hours, mins)
+
+            current_dasha = {
+                'lord': current_lord,
+                'start_date': current_date,
+                'end_date': end_date,
+                'duration_str': duration_str,
+                'sub_dashas': self.calculate_antardashas(current_date, remaining_minutes, current_lord)
+            }
+            all_dashas.append(current_dasha)
+            current_date = end_date
+
+            # Calculate remaining dashas
+            for i in range(1, 9):
                 lord_index = (start_lord_index + i) % 9
                 lord = self.dasha_order[lord_index]
-                total_minutes = self.dasha_years[lord] * 525600  # Convert years to minutes
-
-                if i == 0:
-                    total_minutes = int(total_minutes * balance)
+                total_minutes = self.dasha_years[lord] * 525600
 
                 end_date = self.add_period_to_datetime(current_date, total_minutes)
                 years, months, days, hours, mins = self.calculate_period(total_minutes)
                 duration_str = self.format_duration(years, months, days, hours, mins)
 
-                maha_dasha = {
+                dasha = {
                     'lord': lord,
                     'start_date': current_date,
                     'end_date': end_date,
@@ -432,7 +456,7 @@ class DashaCalculator:
                     'sub_dashas': self.calculate_antardashas(current_date, total_minutes, lord)
                 }
 
-                all_dashas.append(maha_dasha)
+                all_dashas.append(dasha)
                 current_date = end_date
 
             return all_dashas
