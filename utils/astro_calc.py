@@ -315,18 +315,39 @@ class AstroCalc:
 
     def determine_house(self, longitude, house_cusps):
         """Helper function to determine house placement."""
+        # Normalize all angles to 0-360 range
+        longitude = longitude % 360
+        house_cusps = [cusp % 360 for cusp in house_cusps]
+        
+        # Print debugging info
+        print("\nHouse Cusps:")
         for i in range(12):
-            next_cusp = house_cusps[(i + 1) % 12]
-            current_cusp = house_cusps[i]
+            print(f"House {i+1}: {house_cusps[i]:.2f}°")
+        print(f"\nPlanet longitude: {longitude:.2f}°")
+        
+        # Normalize all angles to be relative to the planet's longitude
+        # This makes it easier to compare angles that span 0°
+        normalized_cusps = []
+        for cusp in house_cusps:
+            # Shift angles so planet is at 0°
+            shifted = (cusp - longitude) % 360
+            normalized_cusps.append(shifted)
+        
+        # Find the first house cusp that's positive (after planet)
+        # That's the end of the house the planet is in
+        min_angle = 360
+        house_num = 0
+        for i in range(12):
+            if 0 < normalized_cusps[i] < min_angle:
+                min_angle = normalized_cusps[i]
+                house_num = i
+        
+        # The house number is the one that starts at the previous cusp
+        # Add 1 since house_num is 0-based
+        house = house_num + 1
             
-            # Handle case where house spans 0° Aries
-            if current_cusp > next_cusp:
-                if longitude >= current_cusp or longitude < next_cusp:
-                    return i + 1
-            else:
-                if current_cusp <= longitude < next_cusp:
-                    return i + 1
-        return 1  # Default to 1st house if no match found 
+        print(f"Planet found in house {house}")
+        return house
 
 class DashaCalculator:
     def __init__(self):
