@@ -473,6 +473,32 @@ class InputPage(QWidget):
             return
             
         try:
+            # Check if profile already exists
+            current_name = self.name_input.text()
+            existing_profiles = []
+            profile_exists = False
+            
+            try:
+                with open("profiles.json", "r") as f:
+                    for line in f:
+                        if line.strip():
+                            profile = json.loads(line)
+                            if profile["name"] == current_name and not profile_exists:
+                                profile_exists = True
+                                reply = QMessageBox.question(
+                                    self, 
+                                    "Profile Exists",
+                                    f"A profile with name '{current_name}' already exists. Do you want to overwrite it?",
+                                    QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+                                    QMessageBox.StandardButton.No
+                                )
+                                if reply == QMessageBox.StandardButton.No:
+                                    return
+                            elif profile["name"] != current_name:
+                                existing_profiles.append(profile)
+            except FileNotFoundError:
+                pass  # File doesn't exist yet, which is fine
+                
             # Get the current date time from the widget
             current_datetime = self.date_time.dateTime()
             
@@ -483,8 +509,8 @@ class InputPage(QWidget):
             lon_decimal = self.dms_to_decimal(lon_str)
             
             # Create profile data
-            profile_data = {
-                "name": self.name_input.text(),
+            new_profile = {
+                "name": current_name,
                 "datetime": current_datetime.toString("dd/MM/yyyy hh:mm:ss"),
                 "city": self.city_input.text(),
                 "latitude": lat_str,  # Store as DMS string
@@ -493,10 +519,14 @@ class InputPage(QWidget):
                 "longitude_decimal": lon_decimal  # Store decimal for calculations
             }
             
-            # Save to file
-            with open("profiles.json", "a") as f:
-                json.dump(profile_data, f)
+            # Write all profiles back to file
+            with open("profiles.json", "w") as f:
+                for profile in existing_profiles:
+                    json.dump(profile, f)
+                    f.write("\n")
+                json.dump(new_profile, f)
                 f.write("\n")
+                
             QMessageBox.information(self, "Success", "Profile saved successfully!")
             
         except ValueError as e:
