@@ -138,8 +138,8 @@ class YogeswarananadaWindow(QDialog):
                     lord_house = h
                     break
             if lord_house:
-                details += self.add_points(lord_house, 1, 
-                    f"Extra point for {house_lord}'s placement (as {planet}'s house lord)")
+                details += self.add_points(lord_house, points, 
+                    f"Extra {points} points for {house_lord}'s placement (as {planet}'s house lord)")
         
         return details
 

@@ -223,7 +223,7 @@ class InputPage(QWidget):
         date_label.setMinimumWidth(100)
         self.date_time = QDateTimeEdit()
         self.date_time.setDateTime(QDateTime.currentDateTime())
-        self.date_time.setDisplayFormat("dd/MM/yyyy hh:mm")
+        self.date_time.setDisplayFormat("dd/MM/yyyy hh:mm:ss")
         self.date_time.setCalendarPopup(True)
         date_layout.addWidget(date_label)
         date_layout.addWidget(self.date_time)
@@ -566,8 +566,9 @@ class InputPage(QWidget):
     def get_form_data(self):
         """Get and validate form data."""
         try:
-            latitude = float(self.lat_input.text()) if self.lat_input.text().strip() else None
-            longitude = float(self.long_input.text()) if self.long_input.text().strip() else None
+            # Convert DMS coordinates to decimal
+            latitude = self.dms_to_decimal(self.lat_input.text()) if self.lat_input.text().strip() else None
+            longitude = self.dms_to_decimal(self.long_input.text()) if self.long_input.text().strip() else None
         except ValueError:
             latitude = None
             longitude = None
