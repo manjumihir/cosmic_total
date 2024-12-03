@@ -473,6 +473,9 @@ class InputPage(QWidget):
             return
             
         try:
+            # Get the current date time from the widget
+            current_datetime = self.date_time.dateTime()
+            
             # Validate coordinates
             lat_str = self.lat_input.text().strip()
             lon_str = self.long_input.text().strip()
@@ -482,7 +485,7 @@ class InputPage(QWidget):
             # Create profile data
             profile_data = {
                 "name": self.name_input.text(),
-                "datetime": self.date_time.dateTime().toString("dd/MM/yyyy hh:mm"),
+                "datetime": current_datetime.toString("dd/MM/yyyy hh:mm:ss"),
                 "city": self.city_input.text(),
                 "latitude": lat_str,  # Store as DMS string
                 "longitude": lon_str,  # Store as DMS string
@@ -527,8 +530,8 @@ class InputPage(QWidget):
                 table.setItem(row, 0, QTableWidgetItem(str(profile.get("name", ""))))
                 table.setItem(row, 1, QTableWidgetItem(str(profile.get("datetime", ""))))
                 table.setItem(row, 2, QTableWidgetItem(str(profile.get("city", ""))))
-                table.setItem(row, 3, QTableWidgetItem(str(profile.get("latitude", ""))))  # Use DMS string
-                table.setItem(row, 4, QTableWidgetItem(str(profile.get("longitude", ""))))  # Use DMS string
+                table.setItem(row, 3, QTableWidgetItem(str(profile.get("latitude", ""))))
+                table.setItem(row, 4, QTableWidgetItem(str(profile.get("longitude", ""))))
             
             # Add load button
             def load_selected():
@@ -537,14 +540,17 @@ class InputPage(QWidget):
                     profile = profiles[current_row]
                     self.name_input.setText(str(profile.get("name", "")))
                     self.city_input.setText(str(profile.get("city", "")))
-                    self.lat_input.setText(str(profile.get("latitude", "")))  # Load DMS string
-                    self.long_input.setText(str(profile.get("longitude", "")))  # Load DMS string
+                    self.lat_input.setText(str(profile.get("latitude", "")))
+                    self.long_input.setText(str(profile.get("longitude", "")))
                     
                     # Parse and set datetime
                     datetime_str = profile.get("datetime", "")
                     if datetime_str:
-                        dt = QDateTime.fromString(datetime_str, "dd/MM/yyyy hh:mm")
-                        self.date_time.setDateTime(dt)
+                        dt = QDateTime.fromString(datetime_str, "dd/MM/yyyy hh:mm:ss")
+                        if dt.isValid():
+                            self.date_time.setDateTime(dt)
+                        else:
+                            print(f"Failed to parse datetime: {datetime_str}")
                     
                     dialog.accept()
             
@@ -569,7 +575,12 @@ class InputPage(QWidget):
             # Convert DMS coordinates to decimal
             latitude = self.dms_to_decimal(self.lat_input.text()) if self.lat_input.text().strip() else None
             longitude = self.dms_to_decimal(self.long_input.text()) if self.long_input.text().strip() else None
-        except ValueError:
+            
+            print(f"Converting coordinates - Input: Lat={self.lat_input.text()}, Long={self.long_input.text()}")
+            print(f"Converted to decimal: Lat={latitude}, Long={longitude}")
+            
+        except ValueError as e:
+            print(f"Error converting coordinates: {str(e)}")
             latitude = None
             longitude = None
         
